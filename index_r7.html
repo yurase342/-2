@@ -1,0 +1,2525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>所得税・住民税・手取りシミュレーター（令和7年度版）</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background-color: #1f2937;
+      color: #f9fafb;
+    }
+    .dark-mode .bg-white {
+      background-color: #374151 !important;
+      color: #f9fafb;
+    }
+    .dark-mode .text-gray-800 {
+      color: #f9fafb !important;
+    }
+    .dark-mode .text-gray-700 {
+      color: #d1d5db !important;
+    }
+    .dark-mode .text-gray-600 {
+      color: #9ca3af !important;
+    }
+    .dark-mode .border-gray-300 {
+      border-color: #4b5563 !important;
+    }
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .accordion-content.open {
+      max-height: 2000px;
+      transition: max-height 0.5s ease-in;
+    }
+    .fade-in {
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 200px;
+      background-color: #1f2937;
+      color: #fff;
+      text-align: left;
+      border-radius: 6px;
+      padding: 8px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4" id="body">
+  <div class="max-w-7xl mx-auto">
+    <!-- ヘッダー -->
+    <header class="text-center mb-8">
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex gap-2">
+          <button
+            id="darkModeToggle"
+            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-sm font-medium"
+            onclick="toggleDarkMode()"
+            aria-label="ダークモード切り替え"
+          >
+            🌙 ダークモード
+          </button>
+          <button
+            id="presetBtn"
+            class="px-4 py-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors text-sm font-medium"
+            onclick="showPresets()"
+          >
+            📋 プリセット
+          </button>
+          <button
+            id="saveBtn"
+            class="px-4 py-2 bg-green-100 hover:bg-green-200 rounded-lg transition-colors text-sm font-medium"
+            onclick="saveScenario()"
+          >
+            💾 保存
+          </button>
+          <button
+            id="compareBtn"
+            class="px-4 py-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors text-sm font-medium"
+            onclick="showCompare()"
+          >
+            ⚖️ 比較
+          </button>
+          <button
+            id="exportBtn"
+            class="px-4 py-2 bg-orange-100 hover:bg-orange-200 rounded-lg transition-colors text-sm font-medium"
+            onclick="exportData()"
+          >
+            📤 エクスポート
+          </button>
+        </div>
+      </div>
+      <h1 class="text-4xl font-bold text-gray-800 mb-2 dark-mode-text">
+        所得税・住民税・手取りシミュレーター
+      </h1>
+      <p class="text-gray-600 dark-mode-text">
+        年収から手取り額を計算します（令和7年度基準）
+      </p>
+      <div class="mt-2 inline-block px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+        2025年度税制改正対応
+      </div>
+    </header>
+
+    <!-- プリセットモーダル -->
+    <div id="presetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-xl font-bold mb-4">プリセットを選択</h3>
+        <div class="space-y-2">
+          <button onclick="loadPreset('salaryman')" class="w-full text-left px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg">
+            💼 サラリーマン（年収500万円、40歳未満、扶養0人）
+          </button>
+          <button onclick="loadPreset('business')" class="w-full text-left px-4 py-2 bg-green-50 hover:bg-green-100 rounded-lg">
+            🏪 個人事業主（事業収入300万円、青色申告65万円）
+          </button>
+          <button onclick="loadPreset('realestate')" class="w-full text-left px-4 py-2 bg-yellow-50 hover:bg-yellow-100 rounded-lg">
+            🏠 不動産オーナー（不動産収入200万円）
+          </button>
+          <button onclick="loadPreset('highincome')" class="w-full text-left px-4 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg">
+            💰 高所得者（年収1000万円、配偶者あり）
+          </button>
+        </div>
+        <button onclick="closePresetModal()" class="mt-4 w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
+
+    <!-- 比較モーダル -->
+    <div id="compareModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-xl font-bold mb-4">シナリオ比較</h3>
+        <div id="compareContent" class="space-y-4">
+          <!-- 動的に生成 -->
+        </div>
+        <button onclick="closeCompareModal()" class="mt-4 w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- 左側：入力フォーム -->
+      <div>
+        <div class="bg-white rounded-lg shadow-md p-6 space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">入力項目</h2>
+          
+          <!-- 基本情報セクション -->
+          <div class="border-b border-gray-200 pb-4">
+            <button
+              onclick="toggleAccordion('basicInfo')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>📊 基本情報</span>
+              <span id="basicInfoIcon">▼</span>
+            </button>
+            <div id="basicInfo" class="accordion-content open space-y-4">
+              <!-- 年収 -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  年収（額面）
+                  <span class="tooltip">
+                    <span class="text-blue-500 cursor-help">ℹ️</span>
+                    <span class="tooltiptext">給与所得の年収を入力してください。給与所得控除が自動計算されます。</span>
+                  </span>
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="range"
+                    id="annualIncomeSlider"
+                    min="0"
+                    max="2000"
+                    step="10"
+                    value="500"
+                    class="flex-1"
+                    oninput="updateIncomeFromSlider(this.value)"
+                  />
+              <input
+                type="number"
+                id="annualIncome"
+                min="0"
+                step="10"
+                value="500"
+                class="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="500"
+                aria-label="年収（額面）"
+              />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0万円</span>
+                  <span>2000万円</span>
+                </div>
+              </div>
+
+          <!-- 年齢 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              年齢
+            </label>
+            <div class="flex space-x-4">
+              <button
+                type="button"
+                id="ageUnder40"
+                class="flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white"
+                onclick="setAge(false)"
+              >
+                40歳未満
+              </button>
+              <button
+                type="button"
+                id="ageOver40"
+                class="flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                onclick="setAge(true)"
+              >
+                40歳以上
+              </button>
+            </div>
+          </div>
+
+              <!-- 扶養親族の人数 -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  扶養親族の人数（16歳以上）
+                  <span class="tooltip">
+                    <span class="text-blue-500 cursor-help">ℹ️</span>
+                    <span class="tooltiptext">16歳以上の扶養親族の人数を入力してください。1人あたり38万円の控除が適用されます。</span>
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  id="dependentCount"
+                  min="0"
+                  max="10"
+                  value="0"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <!-- 特定扶養控除（19-22歳） -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  特定扶養控除（19-22歳の大学生等）
+                  <span class="tooltip">
+                    <span class="text-blue-500 cursor-help">ℹ️</span>
+                    <span class="tooltiptext">令和7年度新設：19-22歳で所得85万円以下の子等がいる場合、63万円の控除が適用されます。</span>
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  id="specificDependentCount"
+                  min="0"
+                  max="10"
+                  value="0"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p class="text-xs text-gray-500 mt-1">※令和7年度新設：1人あたり63万円の控除</p>
+              </div>
+            </div>
+          </div>
+
+              <!-- 配偶者の有無 -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  配偶者の有無
+                </label>
+                <div class="flex space-x-4">
+                  <button
+                    type="button"
+                    id="spouseNo"
+                    class="flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white"
+                    onclick="setSpouse(false)"
+                  >
+                    なし
+                  </button>
+                  <button
+                    type="button"
+                    id="spouseYes"
+                    class="flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    onclick="setSpouse(true)"
+                  >
+                    あり
+                  </button>
+                </div>
+              </div>
+
+              <!-- 配偶者の所得（配偶者控除・配偶者特別控除の判定用） -->
+              <div id="spouseIncomeContainer" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  配偶者の所得
+                  <span class="tooltip">
+                    <span class="text-blue-500 cursor-help">ℹ️</span>
+                    <span class="tooltiptext">配偶者の所得に応じて、配偶者控除（38万円）または配偶者特別控除（38万円〜0円）が適用されます。</span>
+                  </span>
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="spouseIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">※配偶者控除・配偶者特別控除の判定に使用</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 不動産所得セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('realEstate')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>🏠 不動産所得</span>
+              <span id="realEstateIcon">▼</span>
+            </button>
+            <div id="realEstate" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  不動産収入
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="realEstateIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  不動産経費
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="realEstateExpenses"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 事業所得セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('business')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>🏪 事業所得（個人事業主）</span>
+              <span id="businessIcon">▼</span>
+            </button>
+            <div id="business" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  事業収入
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="businessIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  必要経費
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="businessExpenses"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  青色申告控除
+                </label>
+                <select
+                  id="blueReturnDeduction"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="0">なし（0円）</option>
+                  <option value="100000">10万円（簡易帳簿）</option>
+                  <option value="550000">55万円（通常の青色申告）</option>
+                  <option value="650000" selected>65万円（電子帳簿保存またはe-Tax）</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  事業税率
+                </label>
+                <select
+                  id="businessTaxRate"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="5" selected>5%（小売業、飲食業など）</option>
+                  <option value="4">4%（卸売業）</option>
+                  <option value="3">3%（製造業、建設業など）</option>
+                  <option value="custom">その他（カスタム）</option>
+                </select>
+              </div>
+
+              <div id="customTaxRateContainer" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  カスタム事業税率（%）
+                </label>
+                <input
+                  type="number"
+                  id="customBusinessTaxRate"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value="5"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- その他の所得セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('otherIncome')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>💰 その他の所得</span>
+              <span id="otherIncomeIcon">▼</span>
+            </button>
+            <div id="otherIncome" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  配当所得
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="dividendIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  一時所得
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="temporaryIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  雑所得（FX、仮想通貨など）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="miscellaneousIncome"
+                    min="0"
+                    step="10"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">万円</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 人的控除セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('humanDeduction')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>👤 人的控除</span>
+              <span id="humanDeductionIcon">▼</span>
+            </button>
+            <div id="humanDeduction" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  障害者控除
+                </label>
+                <select
+                  id="disabilityDeduction"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="0">なし</option>
+                  <option value="270000">27万円（障害者）</option>
+                  <option value="400000">40万円（特別障害者）</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  寡婦（寡夫）控除
+                </label>
+                <select
+                  id="widowDeduction"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="0">なし</option>
+                  <option value="270000">27万円（寡婦・寡夫）</option>
+                  <option value="350000">35万円（特別寡婦）</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  勤労学生控除
+                </label>
+                <select
+                  id="workingStudentDeduction"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="0">なし</option>
+                  <option value="270000">27万円（勤労学生）</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  ひとり親控除
+                </label>
+                <select
+                  id="singleParentDeduction"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="0">なし</option>
+                  <option value="350000">35万円（ひとり親）</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 保険料控除セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('insurance')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>🛡️ 保険料控除</span>
+              <span id="insuranceIcon">▼</span>
+            </button>
+            <div id="insurance" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  生命保険料控除（一般）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="lifeInsuranceGeneral"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（最大4万円）</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  生命保険料控除（介護医療）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="lifeInsuranceNursing"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（最大4万円）</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  生命保険料控除（個人年金）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="lifeInsurancePension"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（最大4万円）</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  地震保険料控除
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="earthquakeInsurance"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（最大5万円）</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  社会保険料控除（給与以外から支払った分）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="socialInsuranceOther"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- その他の控除セクション -->
+          <div class="border-t border-gray-200 pt-4 mt-4">
+            <button
+              onclick="toggleAccordion('otherDeduction')"
+              class="w-full flex justify-between items-center text-left font-semibold text-lg text-gray-800 mb-4"
+            >
+              <span>📝 その他の控除</span>
+              <span id="otherDeductionIcon">▼</span>
+            </button>
+            <div id="otherDeduction" class="accordion-content space-y-4">
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  医療費控除
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="medicalExpenses"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">※10万円超（または所得の5%）が控除対象</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  小規模企業共済等掛金控除（iDeCo等）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="smallBusinessContribution"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（全額控除）</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  寄附金控除（ふるさと納税等）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="donation"
+                    min="0"
+                    step="1"
+                    value="0"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  住宅ローン控除（住宅借入金等特別控除）
+                </label>
+                <div class="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    id="housingLoanDeduction"
+                    min="0"
+                    step="1"
+                    value="0"
+                    max="400000"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  <span class="text-gray-600 font-medium">円（最大40万円）</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">※令和7年度は最大40万円</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側：結果表示 -->
+      <div>
+        <div class="bg-white rounded-lg shadow-md p-6 space-y-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">計算結果</h2>
+          
+          <!-- 手取り額 -->
+          <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white fade-in">
+            <div class="text-sm font-medium mb-2">手取り年収</div>
+            <div class="text-4xl font-bold" id="takeHomeAmount">
+              0円
+            </div>
+            <div class="text-sm mt-2 opacity-90" id="takeHomeCurrency">
+              ¥0
+            </div>
+            <div class="mt-4 pt-4 border-t border-blue-400">
+              <div class="text-sm font-medium mb-1">手取り月額</div>
+              <div class="text-2xl font-bold" id="takeHomeMonthly">
+                0円
+              </div>
+            </div>
+          </div>
+
+          <!-- 合計税金 -->
+          <div class="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-6 text-white fade-in">
+            <div class="text-sm font-medium mb-2">合計税金</div>
+            <div class="text-4xl font-bold" id="totalTaxAmount">
+              0円
+            </div>
+            <div class="text-sm mt-2 opacity-90" id="totalTaxCurrency">
+              ¥0
+            </div>
+            <div class="mt-4 pt-4 border-t border-red-400">
+              <div class="text-sm font-medium mb-1">税金月額</div>
+              <div class="text-2xl font-bold" id="totalTaxMonthly">
+                0円
+              </div>
+            </div>
+          </div>
+
+          <!-- 詳細内訳 -->
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <h3 class="text-lg font-semibold text-gray-800">詳細内訳</h3>
+              <button
+                onclick="toggleAccordion('deductionDetail')"
+                class="text-sm text-blue-600 hover:text-blue-800"
+              >
+                <span id="deductionDetailToggle">控除の詳細を見る</span>
+              </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-200">
+                    <th class="text-left py-2 px-3 text-gray-700 font-medium">項目</th>
+                    <th class="text-right py-2 px-3 text-gray-700 font-medium">年額</th>
+                    <th class="text-right py-2 px-3 text-gray-700 font-medium">月額</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100" id="resultTable">
+                  <!-- 動的に生成 -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 控除の詳細内訳 -->
+            <div id="deductionDetail" class="accordion-content hidden">
+              <h4 class="text-md font-semibold text-gray-800 mb-3">適用された控除の内訳</h4>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b border-gray-200">
+                      <th class="text-left py-2 px-3 text-gray-700 font-medium">控除項目</th>
+                      <th class="text-right py-2 px-3 text-gray-700 font-medium">金額</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100" id="deductionDetailTable">
+                    <!-- 動的に生成 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- チャート -->
+    <div class="grid grid-cols-1">
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">内訳グラフ</h2>
+        <div class="w-full" style="height: 400px;">
+          <div id="chartContainer" style="position: relative; height: 100%;">
+            <!-- チャートはJavaScriptで動的に生成されます -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <footer class="mt-8 text-center text-sm text-gray-500">
+      <p>
+        本シミュレーターは概算値です。実際の税額は各種控除や地域差により異なる場合があります。
+      </p>
+      <p class="mt-2">
+        <strong>令和7年度の主な改正点：</strong>基礎控除58万円、給与所得控除最低額65万円
+      </p>
+      <p class="mt-2">
+        <strong>対応機能：</strong>給与所得、不動産所得、事業所得、配当所得、一時所得、雑所得
+      </p>
+      <p class="mt-1">
+        <strong>対応控除：</strong>基礎控除、扶養控除、特定扶養控除（19-22歳）、配偶者控除・配偶者特別控除、人的控除（障害者・寡婦・勤労学生・ひとり親）、
+        生命保険料控除、地震保険料控除、社会保険料控除、医療費控除、小規模企業共済等掛金控除（iDeCo）、
+        寄附金控除（ふるさと納税）、住宅ローン控除、青色申告控除
+      </p>
+      <p class="mt-2 text-xs">
+        <strong>機能：</strong>ダークモード、プリセット機能、シナリオ保存・比較、エクスポート、月額表示、控除詳細表示、リアルタイム計算
+      </p>
+    </footer>
+    </div>
+  </div>
+
+  <script>
+    // グローバル変数
+    let isOver40 = false;
+    let hasSpouse = false;
+    let savedScenarios = [];
+    let debounceTimer = null;
+    let isDarkMode = false;
+
+    // デバウンス処理
+    function debounce(func, wait) {
+      return function(...args) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // アコーディオンの開閉
+    function toggleAccordion(id) {
+      const content = document.getElementById(id);
+      const icon = document.getElementById(id + 'Icon');
+      if (content.classList.contains('open')) {
+        content.classList.remove('open');
+        icon.textContent = '▶';
+      } else {
+        content.classList.add('open');
+        icon.textContent = '▼';
+      }
+    }
+
+    // ダークモード切り替え
+    function toggleDarkMode() {
+      isDarkMode = !isDarkMode;
+      const body = document.getElementById('body');
+      if (isDarkMode) {
+        body.classList.add('dark-mode');
+        document.getElementById('darkModeToggle').textContent = '☀️ ライトモード';
+      } else {
+        body.classList.remove('dark-mode');
+        document.getElementById('darkModeToggle').textContent = '🌙 ダークモード';
+      }
+      localStorage.setItem('darkMode', isDarkMode);
+    }
+
+    // プリセット機能
+    function showPresets() {
+      document.getElementById('presetModal').classList.remove('hidden');
+    }
+
+    function closePresetModal() {
+      document.getElementById('presetModal').classList.add('hidden');
+    }
+
+    function loadPreset(type) {
+      const presets = {
+        salaryman: {
+          annualIncome: 500,
+          isOver40: false,
+          dependentCount: 0,
+          hasSpouse: false,
+          spouseIncome: 0
+        },
+        business: {
+          annualIncome: 0,
+          businessIncome: 300,
+          businessExpenses: 100,
+          blueReturnDeduction: 650000,
+          businessTaxRate: 5
+        },
+        realestate: {
+          annualIncome: 500,
+          realEstateIncome: 200,
+          realEstateExpenses: 50
+        },
+        highincome: {
+          annualIncome: 1000,
+          isOver40: true,
+          hasSpouse: true,
+          spouseIncome: 100
+        }
+      };
+
+      const preset = presets[type];
+      if (!preset) return;
+
+      Object.keys(preset).forEach(key => {
+        const element = document.getElementById(key);
+        if (element) {
+          if (key === 'isOver40') {
+            setAge(preset[key]);
+          } else if (key === 'hasSpouse') {
+            setSpouse(preset[key]);
+          } else {
+            element.value = preset[key];
+          }
+        }
+      });
+
+      closePresetModal();
+      updateCalculation();
+    }
+
+    // シナリオ保存
+    function saveScenario() {
+      const scenario = getAllInputs();
+      const name = prompt('シナリオ名を入力してください:');
+      if (name) {
+        scenario.name = name;
+        scenario.id = Date.now();
+        savedScenarios.push(scenario);
+        localStorage.setItem('savedScenarios', JSON.stringify(savedScenarios));
+        alert('シナリオを保存しました');
+      }
+    }
+
+    function getAllInputs() {
+      return {
+        annualIncome: document.getElementById('annualIncome').value,
+        isOver40,
+        dependentCount: document.getElementById('dependentCount').value,
+        specificDependentCount: document.getElementById('specificDependentCount').value,
+        hasSpouse,
+        spouseIncome: document.getElementById('spouseIncome').value,
+        realEstateIncome: document.getElementById('realEstateIncome').value,
+        realEstateExpenses: document.getElementById('realEstateExpenses').value,
+        businessIncome: document.getElementById('businessIncome').value,
+        businessExpenses: document.getElementById('businessExpenses').value,
+        blueReturnDeduction: document.getElementById('blueReturnDeduction').value,
+        businessTaxRate: document.getElementById('businessTaxRate').value,
+        dividendIncome: document.getElementById('dividendIncome').value,
+        temporaryIncome: document.getElementById('temporaryIncome').value,
+        miscellaneousIncome: document.getElementById('miscellaneousIncome').value,
+        disabilityDeduction: document.getElementById('disabilityDeduction').value,
+        widowDeduction: document.getElementById('widowDeduction').value,
+        workingStudentDeduction: document.getElementById('workingStudentDeduction').value,
+        singleParentDeduction: document.getElementById('singleParentDeduction').value,
+        lifeInsuranceGeneral: document.getElementById('lifeInsuranceGeneral').value,
+        lifeInsuranceNursing: document.getElementById('lifeInsuranceNursing').value,
+        lifeInsurancePension: document.getElementById('lifeInsurancePension').value,
+        earthquakeInsurance: document.getElementById('earthquakeInsurance').value,
+        socialInsuranceOther: document.getElementById('socialInsuranceOther').value,
+        medicalExpenses: document.getElementById('medicalExpenses').value,
+        smallBusinessContribution: document.getElementById('smallBusinessContribution').value,
+        donation: document.getElementById('donation').value,
+        housingLoanDeduction: document.getElementById('housingLoanDeduction').value
+      };
+    }
+
+    // シナリオ比較
+    function showCompare() {
+      const saved = JSON.parse(localStorage.getItem('savedScenarios') || '[]');
+      if (saved.length === 0) {
+        alert('保存されたシナリオがありません。まずシナリオを保存してください。');
+        return;
+      }
+
+      const current = getAllInputs();
+      current.name = '現在の設定';
+      const allScenarios = [current, ...saved];
+
+      let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+      allScenarios.forEach((scenario, index) => {
+        // 各シナリオの計算結果を取得
+        const result = calculateScenarioTax(scenario);
+        html += `<div class="border rounded-lg p-4 bg-white">
+          <h4 class="font-bold mb-3 text-lg">${scenario.name || `シナリオ${index + 1}`}</h4>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span>年収:</span>
+              <span class="font-medium">${scenario.annualIncome || 0}万円</span>
+            </div>
+            <div class="flex justify-between">
+              <span>手取り年収:</span>
+              <span class="font-bold text-blue-600">${formatYen(result.takeHome)}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>手取り月額:</span>
+              <span class="font-medium">${formatYen(result.takeHome / 12)}</span>
+            </div>
+            <div class="flex justify-between border-t pt-2">
+              <span>所得税:</span>
+              <span class="text-red-600">${formatYen(result.incomeTax.total)}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>住民税:</span>
+              <span class="text-orange-600">${formatYen(result.residentTax.total)}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>社会保険料:</span>
+              <span class="text-yellow-600">${formatYen(result.socialInsurance.total)}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+
+      document.getElementById('compareContent').innerHTML = html;
+      document.getElementById('compareModal').classList.remove('hidden');
+    }
+
+    // シナリオから税額を計算
+    function calculateScenarioTax(scenario) {
+      const annualIncome = parseFloat(scenario.annualIncome || 0) * 10_000;
+      const isOver40 = scenario.isOver40 || false;
+      const dependentCount = parseInt(scenario.dependentCount || 0);
+      const specificDependentCount = parseInt(scenario.specificDependentCount || 0);
+      const hasSpouse = scenario.hasSpouse || false;
+      const spouseIncome = parseFloat(scenario.spouseIncome || 0);
+      const realEstateIncome = parseFloat(scenario.realEstateIncome || 0) * 10_000;
+      const realEstateExpenses = parseFloat(scenario.realEstateExpenses || 0) * 10_000;
+      const businessIncome = parseFloat(scenario.businessIncome || 0) * 10_000;
+      const businessExpenses = parseFloat(scenario.businessExpenses || 0) * 10_000;
+      const blueReturnDeduction = parseFloat(scenario.blueReturnDeduction || 0);
+      const businessTaxRate = parseFloat(scenario.businessTaxRate || 5);
+      const dividendIncome = parseFloat(scenario.dividendIncome || 0) * 10_000;
+      const temporaryIncome = parseFloat(scenario.temporaryIncome || 0) * 10_000;
+      const miscellaneousIncome = parseFloat(scenario.miscellaneousIncome || 0) * 10_000;
+      const disabilityDeduction = parseFloat(scenario.disabilityDeduction || 0);
+      const widowDeduction = parseFloat(scenario.widowDeduction || 0);
+      const workingStudentDeduction = parseFloat(scenario.workingStudentDeduction || 0);
+      const singleParentDeduction = parseFloat(scenario.singleParentDeduction || 0);
+      const lifeInsuranceGeneral = parseFloat(scenario.lifeInsuranceGeneral || 0);
+      const lifeInsuranceNursing = parseFloat(scenario.lifeInsuranceNursing || 0);
+      const lifeInsurancePension = parseFloat(scenario.lifeInsurancePension || 0);
+      const earthquakeInsurance = parseFloat(scenario.earthquakeInsurance || 0);
+      const socialInsuranceOther = parseFloat(scenario.socialInsuranceOther || 0);
+      const medicalExpenses = parseFloat(scenario.medicalExpenses || 0);
+      const smallBusinessContribution = parseFloat(scenario.smallBusinessContribution || 0);
+      const donation = parseFloat(scenario.donation || 0);
+      const housingLoanDeduction = parseFloat(scenario.housingLoanDeduction || 0);
+
+      return calculateTax(
+        annualIncome,
+        isOver40,
+        dependentCount,
+        specificDependentCount,
+        hasSpouse,
+        spouseIncome,
+        realEstateIncome,
+        realEstateExpenses,
+        businessIncome,
+        businessExpenses,
+        blueReturnDeduction,
+        businessTaxRate,
+        dividendIncome,
+        temporaryIncome,
+        miscellaneousIncome,
+        disabilityDeduction,
+        widowDeduction,
+        workingStudentDeduction,
+        singleParentDeduction,
+        lifeInsuranceGeneral,
+        lifeInsuranceNursing,
+        lifeInsurancePension,
+        earthquakeInsurance,
+        socialInsuranceOther,
+        medicalExpenses,
+        smallBusinessContribution,
+        donation,
+        housingLoanDeduction
+      );
+    }
+
+    function closeCompareModal() {
+      document.getElementById('compareModal').classList.add('hidden');
+    }
+
+    // エクスポート機能
+    function exportData() {
+      const result = calculateCurrentTax();
+      if (!result) {
+        alert('計算結果がありません。まず計算を実行してください。');
+        return;
+      }
+
+      const format = confirm('CSV形式でエクスポートしますか？\n「OK」でCSV、「キャンセル」でテキスト形式');
+      
+      const data = {
+        '計算日時': new Date().toLocaleString('ja-JP'),
+        '年収（額面）': formatYen(result.annualIncome),
+        '手取り年収': formatYen(result.takeHome),
+        '手取り月額': formatYen(result.takeHome / 12),
+        '所得税': formatYen(result.incomeTax.total),
+        '住民税': formatYen(result.residentTax.total),
+        '社会保険料': formatYen(result.socialInsurance.total),
+        '事業税': formatYen(result.businessTax),
+        '総収入': formatYen(result.totalRevenue),
+        '給与所得': formatYen(result.salaryIncome),
+        '不動産所得': formatYen(result.realEstateIncome),
+        '事業所得': formatYen(result.businessIncome),
+        '配当所得': formatYen(result.dividendIncome),
+        '一時所得': formatYen(result.temporaryIncome),
+        '雑所得': formatYen(result.miscellaneousIncome),
+        '課税所得（所得税）': formatYen(result.incomeTax.taxableIncome),
+        '課税所得（住民税）': formatYen(result.residentTax.taxableIncome)
+      };
+
+      if (format) {
+        // CSV形式でエクスポート
+        const csv = Object.entries(data).map(([key, value]) => `"${key}","${value}"`).join('\n');
+        const header = '\ufeff項目,金額\n';
+        const blob = new Blob([header + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `所得税シミュレーター_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+      } else {
+        // テキスト形式でエクスポート
+        const text = Object.entries(data).map(([key, value]) => `${key}: ${value}`).join('\n');
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `所得税シミュレーター_${new Date().toISOString().split('T')[0]}.txt`;
+        link.click();
+      }
+    }
+
+    // スライダーから年収を更新
+    function updateIncomeFromSlider(value) {
+      document.getElementById('annualIncome').value = value;
+      updateCalculation();
+    }
+
+    // 給与所得控除の計算（令和7年度：最低額65万円に引き上げ）
+    function calculateSalaryDeduction(annualIncome) {
+      const income = annualIncome;
+      
+      if (income <= 1_625_000) {
+        return 650_000; // 令和7年度：55万円→65万円に引き上げ
+      } else if (income <= 1_800_000) {
+        return income * 0.4 - 100_000;
+      } else if (income <= 3_600_000) {
+        return income * 0.3 + 80_000;
+      } else if (income <= 6_600_000) {
+        return income * 0.2 + 440_000;
+      } else if (income <= 8_500_000) {
+        return income * 0.1 + 1_100_000;
+      } else {
+        return 1_950_000; // 上限
+      }
+    }
+
+    // 給与所得の計算
+    function calculateSalaryIncome(annualIncome) {
+      const deduction = calculateSalaryDeduction(annualIncome);
+      return annualIncome - deduction;
+    }
+
+    // 社会保険料の計算
+    function calculateSocialInsurance(annualIncome, isOver40) {
+      const pension = annualIncome * 0.0915;
+      const health = annualIncome * 0.05;
+      const employment = annualIncome * 0.006;
+      const nursing = isOver40 ? annualIncome * 0.009 : 0;
+      
+      return {
+        pension,
+        health,
+        employment,
+        nursing,
+        total: pension + health + employment + nursing,
+      };
+    }
+
+    // 不動産所得の計算
+    function calculateRealEstateIncome(realEstateIncome, realEstateExpenses) {
+      return Math.max(0, realEstateIncome - realEstateExpenses);
+    }
+
+    // 事業所得の計算
+    function calculateBusinessIncome(businessIncome, businessExpenses, blueReturnDeduction) {
+      const netBusinessIncome = businessIncome - businessExpenses;
+      return Math.max(0, netBusinessIncome - blueReturnDeduction);
+    }
+
+    // 配当所得の計算（総合課税の場合、簡易的にそのまま）
+    function calculateDividendIncome(dividendIncome) {
+      return dividendIncome;
+    }
+
+    // 一時所得の計算（50万円控除、1/2課税）
+    function calculateTemporaryIncome(temporaryIncome) {
+      const netIncome = Math.max(0, temporaryIncome - 500_000);
+      return netIncome * 0.5; // 1/2課税
+    }
+
+    // 雑所得の計算（簡易的にそのまま）
+    function calculateMiscellaneousIncome(miscellaneousIncome) {
+      return miscellaneousIncome;
+    }
+
+    // 配偶者控除・配偶者特別控除の計算
+    function calculateSpouseDeduction(hasSpouse, spouseIncome) {
+      if (!hasSpouse || spouseIncome === undefined || spouseIncome === null || isNaN(spouseIncome)) {
+        return 0;
+      }
+      
+      const spouseIncomeYen = (parseFloat(spouseIncome) || 0) * 10_000;
+      
+      // 配偶者控除（所得48万円以下）
+      if (spouseIncomeYen <= 480_000) {
+        return 380_000;
+      }
+      
+      // 配偶者特別控除（所得48万円超133万円以下）
+      if (spouseIncomeYen > 480_000 && spouseIncomeYen <= 1_330_000) {
+        if (spouseIncomeYen <= 500_000) return 380_000;
+        if (spouseIncomeYen <= 550_000) return 360_000;
+        if (spouseIncomeYen <= 600_000) return 310_000;
+        if (spouseIncomeYen <= 650_000) return 260_000;
+        if (spouseIncomeYen <= 700_000) return 210_000;
+        if (spouseIncomeYen <= 750_000) return 160_000;
+        if (spouseIncomeYen <= 800_000) return 110_000;
+        if (spouseIncomeYen <= 850_000) return 60_000;
+        if (spouseIncomeYen <= 900_000) return 30_000;
+        if (spouseIncomeYen <= 950_000) return 10_000;
+        return 0;
+      }
+      
+      return 0;
+    }
+
+    // 生命保険料控除の計算
+    function calculateLifeInsuranceDeduction(general, nursing, pension) {
+      const calcSingle = (amount) => {
+        if (amount <= 20_000) return amount;
+        if (amount <= 40_000) return amount / 2 + 10_000;
+        if (amount <= 80_000) return amount / 4 + 20_000;
+        return 40_000; // 最大4万円
+      };
+      
+      const generalDeduction = calcSingle(Math.min(general, 80_000));
+      const nursingDeduction = calcSingle(Math.min(nursing, 80_000));
+      const pensionDeduction = calcSingle(Math.min(pension, 80_000));
+      
+      return generalDeduction + nursingDeduction + pensionDeduction; // 最大12万円
+    }
+
+    // 地震保険料控除の計算
+    function calculateEarthquakeInsuranceDeduction(amount) {
+      if (amount <= 50_000) {
+        return amount / 2; // 1/2
+      }
+      return 25_000; // 最大2.5万円（保険料5万円の1/2）
+    }
+
+    // 医療費控除の計算
+    function calculateMedicalExpensesDeduction(medicalExpenses, totalIncome) {
+      const threshold = Math.max(100_000, totalIncome * 0.05);
+      return Math.max(0, medicalExpenses - threshold);
+    }
+
+    // 寄附金控除の計算（簡易版：所得控除方式）
+    function calculateDonationDeduction(donation, totalIncome) {
+      // 寄附金控除額 = 寄附金額 - 2,000円（ただし、寄附金額の40%が上限）
+      const deduction = Math.max(0, donation - 2_000);
+      const maxDeduction = totalIncome * 0.4;
+      return Math.min(deduction, maxDeduction);
+    }
+
+    // 事業税の計算（事業主控除290万円を考慮）
+    function calculateBusinessTax(businessIncome, businessExpenses, businessTaxRate) {
+      const netBusinessIncome = businessIncome - businessExpenses;
+      const businessOwnerDeduction = 2_900_000; // 事業主控除
+      const taxableBusinessIncome = Math.max(0, netBusinessIncome - businessOwnerDeduction);
+      return taxableBusinessIncome * (businessTaxRate / 100);
+    }
+
+    // 所得税の計算（令和7年度：基礎控除58万円に引き上げ）
+    function calculateIncomeTax(
+      totalIncome,
+      socialInsuranceTotal,
+      dependentCount,
+      specificDependentCount,
+      hasSpouse,
+      spouseIncome,
+      disabilityDeduction,
+      widowDeduction,
+      workingStudentDeduction,
+      singleParentDeduction,
+      lifeInsuranceGeneral,
+      lifeInsuranceNursing,
+      lifeInsurancePension,
+      earthquakeInsurance,
+      socialInsuranceOther,
+      medicalExpenses,
+      smallBusinessContribution,
+      donation,
+      housingLoanDeduction
+    ) {
+      // 令和7年度：基礎控除48万円→58万円に引き上げ
+      const basicDeduction = 580_000;
+      const dependentDeduction = dependentCount * 380_000;
+      // 特定扶養控除（19-22歳）：令和7年度新設、1人あたり63万円
+      const specificDependentDeduction = specificDependentCount * 630_000;
+      const spouseDeduction = calculateSpouseDeduction(hasSpouse, spouseIncome);
+      
+      // 人的控除
+      const humanDeductions = disabilityDeduction + widowDeduction + workingStudentDeduction + singleParentDeduction;
+      
+      // 保険料控除
+      const lifeInsuranceDeduction = calculateLifeInsuranceDeduction(
+        lifeInsuranceGeneral,
+        lifeInsuranceNursing,
+        lifeInsurancePension
+      );
+      const earthquakeDeduction = calculateEarthquakeInsuranceDeduction(earthquakeInsurance);
+      const insuranceDeductions = lifeInsuranceDeduction + earthquakeDeduction;
+      
+      // その他の控除
+      const medicalDeduction = calculateMedicalExpensesDeduction(medicalExpenses, totalIncome);
+      const donationDeduction = calculateDonationDeduction(donation, totalIncome);
+      
+      // 社会保険料控除（給与以外）
+      const socialInsuranceDeduction = socialInsuranceOther;
+      
+      // すべての控除を合計
+      const totalDeductions = 
+        basicDeduction +
+        dependentDeduction +
+        specificDependentDeduction +
+        spouseDeduction +
+        humanDeductions +
+        socialInsuranceTotal +
+        socialInsuranceDeduction +
+        insuranceDeductions +
+        medicalDeduction +
+        smallBusinessContribution +
+        donationDeduction;
+      
+      let taxableIncome = totalIncome - totalDeductions;
+      if (taxableIncome < 0) {
+        taxableIncome = 0;
+      }
+      
+      // 住宅ローン控除は所得税から直接控除（税額控除）
+      
+      let baseTax = 0;
+      if (taxableIncome <= 1_950_000) {
+        baseTax = taxableIncome * 0.05;
+      } else if (taxableIncome <= 3_300_000) {
+        baseTax = taxableIncome * 0.1 - 97_500;
+      } else if (taxableIncome <= 6_950_000) {
+        baseTax = taxableIncome * 0.2 - 427_500;
+      } else if (taxableIncome <= 9_000_000) {
+        baseTax = taxableIncome * 0.23 - 636_000;
+      } else if (taxableIncome <= 18_000_000) {
+        baseTax = taxableIncome * 0.33 - 1_536_000;
+      } else if (taxableIncome <= 40_000_000) {
+        baseTax = taxableIncome * 0.4 - 2_796_000;
+      } else {
+        baseTax = taxableIncome * 0.45 - 4_796_000;
+      }
+      
+      if (baseTax < 0) {
+        baseTax = 0;
+      }
+      
+      const reconstructionTax = baseTax * 0.021;
+      let total = baseTax + reconstructionTax;
+      
+      // 住宅ローン控除（税額控除：所得税から直接控除）
+      if (housingLoanDeduction > 0) {
+        total = Math.max(0, total - housingLoanDeduction);
+      }
+      
+      // 控除の詳細内訳
+      const deductionDetails = {
+        basicDeduction,
+        dependentDeduction,
+        specificDependentDeduction,
+        spouseDeduction,
+        humanDeductions,
+        socialInsuranceTotal,
+        socialInsuranceDeduction,
+        insuranceDeductions,
+        medicalDeduction,
+        smallBusinessContribution,
+        donationDeduction,
+        total: totalDeductions
+      };
+      
+      return {
+        taxableIncome,
+        baseTax,
+        reconstructionTax,
+        housingLoanDeduction,
+        total,
+        deductionDetails
+      };
+    }
+
+    // 住民税の計算（令和7年度：基礎控除53万円に引き上げ）
+    function calculateResidentTax(
+      totalIncome,
+      socialInsuranceTotal,
+      dependentCount,
+      specificDependentCount,
+      hasSpouse,
+      spouseIncome,
+      disabilityDeduction,
+      widowDeduction,
+      workingStudentDeduction,
+      singleParentDeduction,
+      lifeInsuranceGeneral,
+      lifeInsuranceNursing,
+      lifeInsurancePension,
+      earthquakeInsurance,
+      socialInsuranceOther,
+      medicalExpenses,
+      smallBusinessContribution,
+      donation
+    ) {
+      // 令和7年度：住民税基礎控除43万円→53万円に引き上げ（推測）
+      const basicDeduction = 530_000;
+      const dependentDeduction = dependentCount * 380_000;
+      // 特定扶養控除（19-22歳）：令和7年度新設、1人あたり63万円
+      const specificDependentDeduction = specificDependentCount * 630_000;
+      const spouseDeduction = calculateSpouseDeduction(hasSpouse, spouseIncome);
+      
+      // 人的控除
+      const humanDeductions = disabilityDeduction + widowDeduction + workingStudentDeduction + singleParentDeduction;
+      
+      // 保険料控除（住民税も同様に計算）
+      const lifeInsuranceDeduction = calculateLifeInsuranceDeduction(
+        lifeInsuranceGeneral,
+        lifeInsuranceNursing,
+        lifeInsurancePension
+      );
+      const earthquakeDeduction = calculateEarthquakeInsuranceDeduction(earthquakeInsurance);
+      const insuranceDeductions = lifeInsuranceDeduction + earthquakeDeduction;
+      
+      // その他の控除
+      const medicalDeduction = calculateMedicalExpensesDeduction(medicalExpenses, totalIncome);
+      const donationDeduction = calculateDonationDeduction(donation, totalIncome);
+      
+      // 社会保険料控除（給与以外）
+      const socialInsuranceDeduction = socialInsuranceOther;
+      
+      // すべての控除を合計
+      const totalDeductions = 
+        basicDeduction +
+        dependentDeduction +
+        specificDependentDeduction +
+        spouseDeduction +
+        humanDeductions +
+        socialInsuranceTotal +
+        socialInsuranceDeduction +
+        insuranceDeductions +
+        medicalDeduction +
+        smallBusinessContribution +
+        donationDeduction;
+      
+      let taxableIncome = totalIncome - totalDeductions;
+      if (taxableIncome < 0) {
+        taxableIncome = 0;
+      }
+      
+      const incomeTax = taxableIncome * 0.1;
+      const equalTax = 5_000;
+      
+      // 住民税の調整控除の詳細計算
+      // 人的控除の差額（所得税と住民税の人的控除の差）を計算
+      const incomeTaxHumanDeduction = disabilityDeduction + widowDeduction + workingStudentDeduction + singleParentDeduction;
+      const residentTaxHumanDeduction = incomeTaxHumanDeduction; // 同じ
+      const humanDeductionDiff = 0; // 令和7年度は同じ
+      
+      // 調整控除の計算（簡易版）
+      let adjustment = 0;
+      if (taxableIncome > 0 && taxableIncome <= 2_000_000) {
+        adjustment = Math.min(5_000, humanDeductionDiff);
+      } else if (taxableIncome > 2_000_000) {
+        adjustment = Math.max(0, 5_000 - (taxableIncome - 2_000_000) * 0.005);
+      } else {
+        adjustment = 2_500; // 簡易値
+      }
+      
+      const total = Math.max(0, incomeTax + equalTax - adjustment);
+      
+      return {
+        taxableIncome,
+        incomeTax,
+        equalTax,
+        adjustment,
+        total,
+      };
+    }
+
+    // 総合計算
+    function calculateTax(
+      annualIncome,
+      isOver40,
+      dependentCount,
+      specificDependentCount,
+      hasSpouse,
+      spouseIncome,
+      realEstateIncome,
+      realEstateExpenses,
+      businessIncome,
+      businessExpenses,
+      blueReturnDeduction,
+      businessTaxRate,
+      dividendIncome,
+      temporaryIncome,
+      miscellaneousIncome,
+      disabilityDeduction,
+      widowDeduction,
+      workingStudentDeduction,
+      singleParentDeduction,
+      lifeInsuranceGeneral,
+      lifeInsuranceNursing,
+      lifeInsurancePension,
+      earthquakeInsurance,
+      socialInsuranceOther,
+      medicalExpenses,
+      smallBusinessContribution,
+      donation,
+      housingLoanDeduction
+    ) {
+      try {
+        // 数値の正規化（NaNやundefinedを0に変換）
+        const normalize = (val) => (isNaN(val) || val === null || val === undefined) ? 0 : Number(val);
+        
+        annualIncome = normalize(annualIncome);
+        isOver40 = Boolean(isOver40);
+        dependentCount = normalize(dependentCount);
+        specificDependentCount = normalize(specificDependentCount);
+        hasSpouse = Boolean(hasSpouse);
+        spouseIncome = normalize(spouseIncome);
+        realEstateIncome = normalize(realEstateIncome);
+        realEstateExpenses = normalize(realEstateExpenses);
+        businessIncome = normalize(businessIncome);
+        businessExpenses = normalize(businessExpenses);
+        blueReturnDeduction = normalize(blueReturnDeduction);
+        businessTaxRate = normalize(businessTaxRate) || 5;
+        dividendIncome = normalize(dividendIncome);
+        temporaryIncome = normalize(temporaryIncome);
+        miscellaneousIncome = normalize(miscellaneousIncome);
+        disabilityDeduction = normalize(disabilityDeduction);
+        widowDeduction = normalize(widowDeduction);
+        workingStudentDeduction = normalize(workingStudentDeduction);
+        singleParentDeduction = normalize(singleParentDeduction);
+        lifeInsuranceGeneral = normalize(lifeInsuranceGeneral);
+        lifeInsuranceNursing = normalize(lifeInsuranceNursing);
+        lifeInsurancePension = normalize(lifeInsurancePension);
+        earthquakeInsurance = normalize(earthquakeInsurance);
+        socialInsuranceOther = normalize(socialInsuranceOther);
+        medicalExpenses = normalize(medicalExpenses);
+        smallBusinessContribution = normalize(smallBusinessContribution);
+        donation = normalize(donation);
+        housingLoanDeduction = normalize(housingLoanDeduction);
+        
+        // 給与所得の計算
+        const salaryIncome = calculateSalaryIncome(annualIncome);
+        
+        // 不動産所得の計算
+        const realEstateNetIncome = calculateRealEstateIncome(realEstateIncome, realEstateExpenses);
+        
+        // 事業所得の計算（青色申告控除を考慮）
+        const businessNetIncome = calculateBusinessIncome(businessIncome, businessExpenses, blueReturnDeduction);
+        
+        // その他の所得の計算
+        const dividendNetIncome = calculateDividendIncome(dividendIncome);
+        const temporaryNetIncome = calculateTemporaryIncome(temporaryIncome);
+        const miscellaneousNetIncome = calculateMiscellaneousIncome(miscellaneousIncome);
+        
+        // 総所得の計算
+        const totalIncome = salaryIncome + realEstateNetIncome + businessNetIncome + 
+                           dividendNetIncome + temporaryNetIncome + miscellaneousNetIncome;
+        
+        // 社会保険料の計算（給与所得のみに適用）
+        const socialInsurance = calculateSocialInsurance(annualIncome, isOver40);
+        
+        // 所得税の計算
+        const incomeTax = calculateIncomeTax(
+          totalIncome,
+          socialInsurance.total,
+          dependentCount,
+          specificDependentCount,
+          hasSpouse,
+          spouseIncome,
+          disabilityDeduction,
+          widowDeduction,
+          workingStudentDeduction,
+          singleParentDeduction,
+          lifeInsuranceGeneral,
+          lifeInsuranceNursing,
+          lifeInsurancePension,
+          earthquakeInsurance,
+          socialInsuranceOther,
+          medicalExpenses,
+          smallBusinessContribution,
+          donation,
+          housingLoanDeduction
+        );
+        
+        // 住民税の計算
+        const residentTax = calculateResidentTax(
+          totalIncome,
+          socialInsurance.total,
+          dependentCount,
+          specificDependentCount,
+          hasSpouse,
+          spouseIncome,
+          disabilityDeduction,
+          widowDeduction,
+          workingStudentDeduction,
+          singleParentDeduction,
+          lifeInsuranceGeneral,
+          lifeInsuranceNursing,
+          lifeInsurancePension,
+          earthquakeInsurance,
+          socialInsuranceOther,
+          medicalExpenses,
+          smallBusinessContribution,
+          donation
+        );
+        
+        // 事業税の計算
+        const businessTax = calculateBusinessTax(businessIncome, businessExpenses, businessTaxRate);
+        
+        // 総収入（すべての収入の合計）
+        const totalRevenue = annualIncome + realEstateIncome + businessIncome + 
+                            dividendIncome + temporaryIncome + miscellaneousIncome;
+        
+        // 手取り額の計算
+        const takeHome = totalRevenue - incomeTax.total - residentTax.total - socialInsurance.total - businessTax;
+        
+        return {
+          annualIncome,
+          salaryIncome,
+          realEstateIncome: realEstateNetIncome,
+          businessIncome: businessNetIncome,
+          dividendIncome: dividendNetIncome,
+          temporaryIncome: temporaryNetIncome,
+          miscellaneousIncome: miscellaneousNetIncome,
+          totalIncome,
+          totalRevenue,
+          socialInsurance,
+          incomeTax,
+          residentTax,
+          businessTax,
+          takeHome,
+          deductionDetails: incomeTax.deductionDetails || {}
+        };
+      } catch (error) {
+        console.error('calculateTax内でエラー:', error);
+        throw error;
+      }
+    }
+
+    // 現在の設定で計算（エクスポート用）
+    function calculateCurrentTax() {
+      const annualIncome = parseFloat(document.getElementById('annualIncome').value) * 10_000 || 0;
+      const dependentCount = parseInt(document.getElementById('dependentCount').value) || 0;
+      const specificDependentCount = parseInt(document.getElementById('specificDependentCount').value) || 0;
+      const spouseIncome = parseFloat(document.getElementById('spouseIncome').value) || 0;
+      const realEstateIncome = parseFloat(document.getElementById('realEstateIncome').value) * 10_000 || 0;
+      const realEstateExpenses = parseFloat(document.getElementById('realEstateExpenses').value) * 10_000 || 0;
+      const businessIncome = parseFloat(document.getElementById('businessIncome').value) * 10_000 || 0;
+      const businessExpenses = parseFloat(document.getElementById('businessExpenses').value) * 10_000 || 0;
+      const blueReturnDeduction = parseFloat(document.getElementById('blueReturnDeduction').value) || 0;
+      const dividendIncome = parseFloat(document.getElementById('dividendIncome').value) * 10_000 || 0;
+      const temporaryIncome = parseFloat(document.getElementById('temporaryIncome').value) * 10_000 || 0;
+      const miscellaneousIncome = parseFloat(document.getElementById('miscellaneousIncome').value) * 10_000 || 0;
+      const disabilityDeduction = parseFloat(document.getElementById('disabilityDeduction').value) || 0;
+      const widowDeduction = parseFloat(document.getElementById('widowDeduction').value) || 0;
+      const workingStudentDeduction = parseFloat(document.getElementById('workingStudentDeduction').value) || 0;
+      const singleParentDeduction = parseFloat(document.getElementById('singleParentDeduction').value) || 0;
+      const lifeInsuranceGeneral = parseFloat(document.getElementById('lifeInsuranceGeneral').value) || 0;
+      const lifeInsuranceNursing = parseFloat(document.getElementById('lifeInsuranceNursing').value) || 0;
+      const lifeInsurancePension = parseFloat(document.getElementById('lifeInsurancePension').value) || 0;
+      const earthquakeInsurance = parseFloat(document.getElementById('earthquakeInsurance').value) || 0;
+      const socialInsuranceOther = parseFloat(document.getElementById('socialInsuranceOther').value) || 0;
+      const medicalExpenses = parseFloat(document.getElementById('medicalExpenses').value) || 0;
+      const smallBusinessContribution = parseFloat(document.getElementById('smallBusinessContribution').value) || 0;
+      const donation = parseFloat(document.getElementById('donation').value) || 0;
+      const housingLoanDeduction = parseFloat(document.getElementById('housingLoanDeduction').value) || 0;
+      
+      const businessTaxRateSelect = document.getElementById('businessTaxRate');
+      let businessTaxRate = parseFloat(businessTaxRateSelect.value);
+      if (businessTaxRateSelect.value === 'custom') {
+        businessTaxRate = parseFloat(document.getElementById('customBusinessTaxRate').value) || 5;
+      }
+      
+      if (isNaN(annualIncome) || annualIncome < 0) {
+        return null;
+      }
+      
+      return calculateTax(
+        annualIncome,
+        isOver40,
+        dependentCount,
+        specificDependentCount,
+        hasSpouse,
+        spouseIncome,
+        realEstateIncome,
+        realEstateExpenses,
+        businessIncome,
+        businessExpenses,
+        blueReturnDeduction,
+        businessTaxRate,
+        dividendIncome,
+        temporaryIncome,
+        miscellaneousIncome,
+        disabilityDeduction,
+        widowDeduction,
+        workingStudentDeduction,
+        singleParentDeduction,
+        lifeInsuranceGeneral,
+        lifeInsuranceNursing,
+        lifeInsurancePension,
+        earthquakeInsurance,
+        socialInsuranceOther,
+        medicalExpenses,
+        smallBusinessContribution,
+        donation,
+        housingLoanDeduction
+      );
+    }
+
+    // フォーマット関数
+    function formatYen(amount) {
+      return `${Math.round(amount).toLocaleString('ja-JP')}円`;
+    }
+
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('ja-JP', {
+        style: 'currency',
+        currency: 'JPY',
+        maximumFractionDigits: 0,
+      }).format(amount);
+    }
+
+    // 年齢設定
+    function setAge(over40) {
+      isOver40 = over40;
+      const under40Btn = document.getElementById('ageUnder40');
+      const over40Btn = document.getElementById('ageOver40');
+      
+      if (over40) {
+        under40Btn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+        over40Btn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white';
+      } else {
+        under40Btn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white';
+        over40Btn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+      }
+      
+      updateCalculation();
+    }
+
+    // 配偶者設定
+    function setSpouse(has) {
+      hasSpouse = has;
+      const noBtn = document.getElementById('spouseNo');
+      const yesBtn = document.getElementById('spouseYes');
+      const spouseIncomeContainer = document.getElementById('spouseIncomeContainer');
+      
+      if (has) {
+        noBtn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+        yesBtn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white';
+        spouseIncomeContainer.classList.remove('hidden');
+      } else {
+        noBtn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-blue-500 text-white';
+        yesBtn.className = 'flex-1 px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200';
+        spouseIncomeContainer.classList.add('hidden');
+      }
+      
+      updateCalculation();
+    }
+
+    // 計算と表示の更新（デバウンス処理付き）
+    const debouncedUpdate = debounce(() => {
+      updateCalculationInternal();
+    }, 300);
+
+    function updateCalculation() {
+      debouncedUpdate();
+    }
+
+    function updateCalculationInternal() {
+      try {
+        // 年収の取得（NaNチェックを改善）
+        const annualIncomeValue = document.getElementById('annualIncome').value;
+        const annualIncome = (parseFloat(annualIncomeValue) || 0) * 10_000;
+        
+        const dependentCount = parseInt(document.getElementById('dependentCount').value) || 0;
+        const specificDependentCount = parseInt(document.getElementById('specificDependentCount').value) || 0;
+        const spouseIncome = parseFloat(document.getElementById('spouseIncome').value) || 0;
+        const realEstateIncome = (parseFloat(document.getElementById('realEstateIncome').value) || 0) * 10_000;
+        const realEstateExpenses = (parseFloat(document.getElementById('realEstateExpenses').value) || 0) * 10_000;
+        const businessIncome = (parseFloat(document.getElementById('businessIncome').value) || 0) * 10_000;
+        const businessExpenses = (parseFloat(document.getElementById('businessExpenses').value) || 0) * 10_000;
+        const blueReturnDeduction = parseFloat(document.getElementById('blueReturnDeduction').value) || 0;
+        const dividendIncome = (parseFloat(document.getElementById('dividendIncome').value) || 0) * 10_000;
+        const temporaryIncome = (parseFloat(document.getElementById('temporaryIncome').value) || 0) * 10_000;
+        const miscellaneousIncome = (parseFloat(document.getElementById('miscellaneousIncome').value) || 0) * 10_000;
+        const disabilityDeduction = parseFloat(document.getElementById('disabilityDeduction').value) || 0;
+        const widowDeduction = parseFloat(document.getElementById('widowDeduction').value) || 0;
+        const workingStudentDeduction = parseFloat(document.getElementById('workingStudentDeduction').value) || 0;
+        const singleParentDeduction = parseFloat(document.getElementById('singleParentDeduction').value) || 0;
+        const lifeInsuranceGeneral = parseFloat(document.getElementById('lifeInsuranceGeneral').value) || 0;
+        const lifeInsuranceNursing = parseFloat(document.getElementById('lifeInsuranceNursing').value) || 0;
+        const lifeInsurancePension = parseFloat(document.getElementById('lifeInsurancePension').value) || 0;
+        const earthquakeInsurance = parseFloat(document.getElementById('earthquakeInsurance').value) || 0;
+        const socialInsuranceOther = parseFloat(document.getElementById('socialInsuranceOther').value) || 0;
+        const medicalExpenses = parseFloat(document.getElementById('medicalExpenses').value) || 0;
+        const smallBusinessContribution = parseFloat(document.getElementById('smallBusinessContribution').value) || 0;
+        const donation = parseFloat(document.getElementById('donation').value) || 0;
+        const housingLoanDeduction = parseFloat(document.getElementById('housingLoanDeduction').value) || 0;
+        
+        // 事業税率の取得
+        const businessTaxRateSelect = document.getElementById('businessTaxRate');
+        let businessTaxRate = parseFloat(businessTaxRateSelect.value) || 5;
+        if (businessTaxRateSelect && businessTaxRateSelect.value === 'custom') {
+          businessTaxRate = parseFloat(document.getElementById('customBusinessTaxRate').value) || 5;
+        }
+        
+        // 年収が0以下の場合は計算しない（ただし、他の所得がある場合は計算する）
+        const totalIncome = annualIncome + realEstateIncome + businessIncome + dividendIncome + temporaryIncome + miscellaneousIncome;
+        if (totalIncome <= 0) {
+          // 結果をクリア
+          document.getElementById('takeHomeAmount').textContent = '0円';
+          document.getElementById('takeHomeCurrency').textContent = '¥0';
+          document.getElementById('takeHomeMonthly').textContent = '0円';
+          document.getElementById('resultTable').innerHTML = '<tr><td colspan="3" class="py-4 text-center text-gray-500">収入を入力してください</td></tr>';
+          return;
+        }
+        
+        const result = calculateTax(
+        annualIncome,
+        isOver40,
+        dependentCount,
+        specificDependentCount,
+        hasSpouse,
+        spouseIncome,
+        realEstateIncome,
+        realEstateExpenses,
+        businessIncome,
+        businessExpenses,
+        blueReturnDeduction,
+        businessTaxRate,
+        dividendIncome,
+        temporaryIncome,
+        miscellaneousIncome,
+        disabilityDeduction,
+        widowDeduction,
+        workingStudentDeduction,
+        singleParentDeduction,
+        lifeInsuranceGeneral,
+        lifeInsuranceNursing,
+        lifeInsurancePension,
+        earthquakeInsurance,
+        socialInsuranceOther,
+        medicalExpenses,
+        smallBusinessContribution,
+        donation,
+        housingLoanDeduction
+      );
+      
+      // 結果が正しく取得できているか確認
+      if (!result || typeof result.takeHome === 'undefined') {
+        console.error('計算結果が正しく取得できませんでした:', result);
+        document.getElementById('takeHomeAmount').textContent = 'エラー';
+        document.getElementById('takeHomeCurrency').textContent = 'エラー';
+        document.getElementById('takeHomeMonthly').textContent = 'エラー';
+        document.getElementById('totalTaxAmount').textContent = 'エラー';
+        document.getElementById('totalTaxCurrency').textContent = 'エラー';
+        document.getElementById('totalTaxMonthly').textContent = 'エラー';
+        document.getElementById('resultTable').innerHTML = '<tr><td colspan="3" class="py-4 text-center text-red-500">計算結果を取得できませんでした</td></tr>';
+        return;
+      }
+      
+      // 手取り額の表示（アニメーション付き）
+      const takeHomeElement = document.getElementById('takeHomeAmount');
+      const takeHomeCurrencyElement = document.getElementById('takeHomeCurrency');
+      const takeHomeMonthlyElement = document.getElementById('takeHomeMonthly');
+      
+      takeHomeElement.classList.add('fade-in');
+      takeHomeElement.textContent = formatYen(result.takeHome);
+      takeHomeCurrencyElement.textContent = formatCurrency(result.takeHome);
+      takeHomeMonthlyElement.textContent = formatYen(result.takeHome / 12);
+      
+      setTimeout(() => takeHomeElement.classList.remove('fade-in'), 300);
+      
+      // 合計税金の計算と表示（アニメーション付き）
+      const totalTax = result.incomeTax.total + result.residentTax.total + (result.businessTax || 0);
+      const totalTaxElement = document.getElementById('totalTaxAmount');
+      const totalTaxCurrencyElement = document.getElementById('totalTaxCurrency');
+      const totalTaxMonthlyElement = document.getElementById('totalTaxMonthly');
+      
+      totalTaxElement.classList.add('fade-in');
+      totalTaxElement.textContent = formatYen(totalTax);
+      totalTaxCurrencyElement.textContent = formatCurrency(totalTax);
+      totalTaxMonthlyElement.textContent = formatYen(totalTax / 12);
+      
+      setTimeout(() => totalTaxElement.classList.remove('fade-in'), 300);
+      
+      // 詳細内訳テーブルの更新
+      const tableBody = document.getElementById('resultTable');
+      let tableHTML = `
+        <tr>
+          <td class="py-3 px-3 text-gray-600">総収入</td>
+          <td class="py-3 px-3 text-right font-medium">${formatYen(result.totalRevenue)}</td>
+          <td class="py-3 px-3 text-right text-gray-500">${formatYen(result.totalRevenue / 12)}</td>
+        </tr>
+      `;
+      
+      if (result.annualIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：給与収入</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.annualIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.annualIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      if (realEstateIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：不動産収入</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(realEstateIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(realEstateIncome / 12)}</td>
+          </tr>
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：不動産所得</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.realEstateIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.realEstateIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      if (businessIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：事業収入</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(businessIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(businessIncome / 12)}</td>
+          </tr>
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：事業所得</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.businessIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.businessIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      if (dividendIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：配当所得</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.dividendIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.dividendIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      if (temporaryIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：一時所得</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.temporaryIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.temporaryIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      if (miscellaneousIncome > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：雑所得</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.miscellaneousIncome)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.miscellaneousIncome / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      // 税金の内訳（合計税金は別枠で表示するため、テーブルには内訳のみ表示）
+      tableHTML += `
+        <tr class="bg-red-50">
+          <td class="py-3 px-3 text-gray-600 font-medium pl-6">内訳：所得税</td>
+          <td class="py-3 px-3 text-right font-medium text-red-600">${formatYen(result.incomeTax.total)}</td>
+          <td class="py-3 px-3 text-right text-red-500 text-sm">${formatYen(result.incomeTax.total / 12)}</td>
+        </tr>
+      `;
+      
+      // 所得税の詳細内訳
+      if (result.incomeTax.baseTax > 0 || result.incomeTax.reconstructionTax > 0) {
+        tableHTML += `
+          <tr class="bg-red-25">
+            <td class="py-2 px-3 text-gray-500 text-xs pl-10">・基準所得税額</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.incomeTax.baseTax)}</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.incomeTax.baseTax / 12)}</td>
+          </tr>
+          <tr class="bg-red-25">
+            <td class="py-2 px-3 text-gray-500 text-xs pl-10">・復興特別所得税</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.incomeTax.reconstructionTax)}</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.incomeTax.reconstructionTax / 12)}</td>
+          </tr>
+        `;
+        if (result.incomeTax.housingLoanDeduction > 0) {
+          tableHTML += `
+            <tr class="bg-red-25">
+              <td class="py-2 px-3 text-gray-500 text-xs pl-10">・住宅ローン控除（税額控除）</td>
+              <td class="py-2 px-3 text-right text-gray-500 text-xs">-${formatYen(result.incomeTax.housingLoanDeduction)}</td>
+              <td class="py-2 px-3 text-right text-gray-500 text-xs">-${formatYen(result.incomeTax.housingLoanDeduction / 12)}</td>
+            </tr>
+          `;
+        }
+      }
+      
+      tableHTML += `
+        <tr class="bg-orange-50">
+          <td class="py-3 px-3 text-gray-600 font-medium pl-6">内訳：住民税</td>
+          <td class="py-3 px-3 text-right font-medium text-orange-600">${formatYen(result.residentTax.total)}</td>
+          <td class="py-3 px-3 text-right text-orange-500 text-sm">${formatYen(result.residentTax.total / 12)}</td>
+        </tr>
+      `;
+      
+      // 住民税の詳細内訳
+      if (result.residentTax.incomeTax !== undefined || result.residentTax.equalTax !== undefined) {
+        tableHTML += `
+          <tr class="bg-orange-25">
+            <td class="py-2 px-3 text-gray-500 text-xs pl-10">・所得割</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.residentTax.incomeTax || 0)}</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen((result.residentTax.incomeTax || 0) / 12)}</td>
+          </tr>
+          <tr class="bg-orange-25">
+            <td class="py-2 px-3 text-gray-500 text-xs pl-10">・均等割</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen(result.residentTax.equalTax || 0)}</td>
+            <td class="py-2 px-3 text-right text-gray-500 text-xs">${formatYen((result.residentTax.equalTax || 0) / 12)}</td>
+          </tr>
+        `;
+        if (result.residentTax.adjustment !== undefined && result.residentTax.adjustment > 0) {
+          tableHTML += `
+            <tr class="bg-orange-25">
+              <td class="py-2 px-3 text-gray-500 text-xs pl-10">・調整控除</td>
+              <td class="py-2 px-3 text-right text-gray-500 text-xs">-${formatYen(result.residentTax.adjustment)}</td>
+              <td class="py-2 px-3 text-right text-gray-500 text-xs">-${formatYen(result.residentTax.adjustment / 12)}</td>
+            </tr>
+          `;
+        }
+      }
+      
+      if (result.businessTax > 0) {
+        tableHTML += `
+          <tr class="bg-purple-50">
+            <td class="py-3 px-3 text-gray-600 font-medium pl-6">内訳：事業税</td>
+            <td class="py-3 px-3 text-right font-medium text-purple-600">${formatYen(result.businessTax)}</td>
+            <td class="py-3 px-3 text-right text-purple-500 text-sm">${formatYen(result.businessTax / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      tableHTML += `
+        <tr class="bg-yellow-50">
+          <td class="py-3 px-3 text-gray-600 font-medium">社会保険料</td>
+          <td class="py-3 px-3 text-right font-medium text-yellow-600">${formatYen(result.socialInsurance.total)}</td>
+          <td class="py-3 px-3 text-right text-yellow-500 text-sm">${formatYen(result.socialInsurance.total / 12)}</td>
+        </tr>
+        <tr class="bg-gray-50">
+          <td class="py-3 px-3 text-gray-500 text-xs">内訳：厚生年金</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.pension)}</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.pension / 12)}</td>
+        </tr>
+        <tr class="bg-gray-50">
+          <td class="py-3 px-3 text-gray-500 text-xs">内訳：健康保険</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.health)}</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.health / 12)}</td>
+        </tr>
+        <tr class="bg-gray-50">
+          <td class="py-3 px-3 text-gray-500 text-xs">内訳：雇用保険</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.employment)}</td>
+          <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.employment / 12)}</td>
+        </tr>
+      `;
+      
+      if (result.socialInsurance.nursing > 0) {
+        tableHTML += `
+          <tr class="bg-gray-50">
+            <td class="py-3 px-3 text-gray-500 text-xs">内訳：介護保険</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.nursing)}</td>
+            <td class="py-3 px-3 text-right text-gray-500 text-xs">${formatYen(result.socialInsurance.nursing / 12)}</td>
+          </tr>
+        `;
+      }
+      
+      tableBody.innerHTML = tableHTML;
+
+      // 控除の詳細内訳を表示
+      if (result.deductionDetails) {
+        const deductionTable = document.getElementById('deductionDetailTable');
+        let deductionHTML = '';
+        const details = result.deductionDetails;
+        
+        if (details.basicDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">基礎控除</td><td class="py-2 px-3 text-right">${formatYen(details.basicDeduction)}</td></tr>`;
+        }
+        if (details.dependentDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">扶養控除</td><td class="py-2 px-3 text-right">${formatYen(details.dependentDeduction)}</td></tr>`;
+        }
+        if (details.specificDependentDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">特定扶養控除（19-22歳）</td><td class="py-2 px-3 text-right">${formatYen(details.specificDependentDeduction)}</td></tr>`;
+        }
+        if (details.spouseDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">配偶者控除・配偶者特別控除</td><td class="py-2 px-3 text-right">${formatYen(details.spouseDeduction)}</td></tr>`;
+        }
+        if (details.humanDeductions > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">人的控除（障害者・寡婦等）</td><td class="py-2 px-3 text-right">${formatYen(details.humanDeductions)}</td></tr>`;
+        }
+        if (details.socialInsuranceTotal > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">社会保険料控除（給与）</td><td class="py-2 px-3 text-right">${formatYen(details.socialInsuranceTotal)}</td></tr>`;
+        }
+        if (details.socialInsuranceDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">社会保険料控除（給与以外）</td><td class="py-2 px-3 text-right">${formatYen(details.socialInsuranceDeduction)}</td></tr>`;
+        }
+        if (details.insuranceDeductions > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">生命保険料控除・地震保険料控除</td><td class="py-2 px-3 text-right">${formatYen(details.insuranceDeductions)}</td></tr>`;
+        }
+        if (details.medicalDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">医療費控除</td><td class="py-2 px-3 text-right">${formatYen(details.medicalDeduction)}</td></tr>`;
+        }
+        if (details.smallBusinessContribution > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">小規模企業共済等掛金控除（iDeCo等）</td><td class="py-2 px-3 text-right">${formatYen(details.smallBusinessContribution)}</td></tr>`;
+        }
+        if (details.donationDeduction > 0) {
+          deductionHTML += `<tr><td class="py-2 px-3">寄附金控除（ふるさと納税等）</td><td class="py-2 px-3 text-right">${formatYen(details.donationDeduction)}</td></tr>`;
+        }
+        deductionHTML += `<tr class="border-t border-gray-300"><td class="py-2 px-3 font-semibold">控除合計</td><td class="py-2 px-3 text-right font-semibold">${formatYen(details.total)}</td></tr>`;
+        
+        deductionTable.innerHTML = deductionHTML;
+      }
+      
+      // チャートの更新
+      updateChart(result);
+      } catch (error) {
+        console.error('計算エラー:', error);
+        console.error('エラースタック:', error.stack);
+        // エラー時は結果をクリア
+        const errorMessage = error.message || '計算中にエラーが発生しました';
+        document.getElementById('takeHomeAmount').textContent = 'エラー';
+        document.getElementById('takeHomeCurrency').textContent = 'エラー';
+        document.getElementById('takeHomeMonthly').textContent = 'エラー';
+        document.getElementById('totalTaxAmount').textContent = 'エラー';
+        document.getElementById('totalTaxCurrency').textContent = 'エラー';
+        document.getElementById('totalTaxMonthly').textContent = 'エラー';
+        document.getElementById('resultTable').innerHTML = `<tr><td colspan="3" class="py-4 text-center text-red-500">${errorMessage}<br><small>コンソールで詳細を確認してください</small></td></tr>`;
+      }
+    }
+
+    // チャートの更新
+    let chartInstance = null;
+    
+    function updateChart(result) {
+      // Chart.jsが読み込まれていない場合はスキップ
+      if (typeof Chart === 'undefined') {
+        const container = document.getElementById('chartContainer');
+        container.innerHTML = '<p class="text-gray-500 text-center py-20">チャートを読み込み中...</p>';
+        return;
+      }
+      
+      const container = document.getElementById('chartContainer');
+      
+      // 既存のチャートを破棄
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+      
+      // Canvas要素を作成
+      container.innerHTML = '<canvas id="taxChart"></canvas>';
+      const canvas = document.getElementById('taxChart');
+      const ctx = canvas.getContext('2d');
+      
+      const data = [
+        { name: '手取り', value: result.takeHome, color: '#3B82F6' },
+        { name: '所得税', value: result.incomeTax.total, color: '#EF4444' },
+        { name: '住民税', value: result.residentTax.total, color: '#F97316' },
+        { name: '社会保険料', value: result.socialInsurance.total, color: '#EAB308' },
+      ];
+      
+      // 事業税がある場合は追加
+      if (result.businessTax > 0) {
+        data.push({ name: '事業税', value: result.businessTax, color: '#A855F7' });
+      }
+      
+      const formatCurrency = (value) => {
+        return `${Math.round(value / 10000)}万円`;
+      };
+      
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: data.map(d => d.name),
+          datasets: [{
+            data: data.map(d => d.value),
+            backgroundColor: data.map(d => d.color),
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            animateRotate: true,
+            animateScale: true,
+            duration: 1000
+          },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 15,
+                font: {
+                  size: 12
+                },
+                generateLabels: function(chart) {
+                  const original = Chart.defaults.plugins.legend.labels.generateLabels;
+                  const labels = original.call(this, chart);
+                  labels.forEach((label, index) => {
+                    label.text = `${data[index].name} (${formatCurrency(data[index].value)})`;
+                  });
+                  return labels;
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const percentage = ((value / result.totalRevenue) * 100).toFixed(1);
+                  return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+                }
+              },
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              padding: 12,
+              titleFont: {
+                size: 14,
+                weight: 'bold'
+              },
+              bodyFont: {
+                size: 12
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 控除詳細の開閉
+    function toggleDeductionDetail() {
+      const content = document.getElementById('deductionDetail');
+      const toggle = document.getElementById('deductionDetailToggle');
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        toggle.textContent = '控除の詳細を閉じる';
+      } else {
+        content.classList.add('hidden');
+        toggle.textContent = '控除の詳細を見る';
+      }
+    }
+
+    // イベントリスナーの設定
+    function init() {
+      // ダークモードの復元
+      const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+      if (savedDarkMode) {
+        isDarkMode = true;
+        toggleDarkMode();
+      }
+
+      // 保存されたシナリオの読み込み
+      const saved = localStorage.getItem('savedScenarios');
+      if (saved) {
+        savedScenarios = JSON.parse(saved);
+      }
+
+      // 基本項目
+      document.getElementById('annualIncome').addEventListener('input', updateCalculation);
+      document.getElementById('annualIncomeSlider').addEventListener('input', function() {
+        updateIncomeFromSlider(this.value);
+      });
+      document.getElementById('dependentCount').addEventListener('input', updateCalculation);
+      document.getElementById('specificDependentCount').addEventListener('input', updateCalculation);
+      document.getElementById('spouseIncome').addEventListener('input', updateCalculation);
+      
+      // 不動産所得
+      document.getElementById('realEstateIncome').addEventListener('input', updateCalculation);
+      document.getElementById('realEstateExpenses').addEventListener('input', updateCalculation);
+      
+      // 事業所得
+      document.getElementById('businessIncome').addEventListener('input', updateCalculation);
+      document.getElementById('businessExpenses').addEventListener('input', updateCalculation);
+      document.getElementById('blueReturnDeduction').addEventListener('change', updateCalculation);
+      document.getElementById('businessTaxRate').addEventListener('change', function() {
+        const customContainer = document.getElementById('customTaxRateContainer');
+        if (this.value === 'custom') {
+          customContainer.classList.remove('hidden');
+        } else {
+          customContainer.classList.add('hidden');
+        }
+        updateCalculation();
+      });
+      document.getElementById('customBusinessTaxRate').addEventListener('input', updateCalculation);
+      
+      // その他の所得
+      document.getElementById('dividendIncome').addEventListener('input', updateCalculation);
+      document.getElementById('temporaryIncome').addEventListener('input', updateCalculation);
+      document.getElementById('miscellaneousIncome').addEventListener('input', updateCalculation);
+      
+      // 人的控除
+      document.getElementById('disabilityDeduction').addEventListener('change', updateCalculation);
+      document.getElementById('widowDeduction').addEventListener('change', updateCalculation);
+      document.getElementById('workingStudentDeduction').addEventListener('change', updateCalculation);
+      document.getElementById('singleParentDeduction').addEventListener('change', updateCalculation);
+      
+      // 保険料控除
+      document.getElementById('lifeInsuranceGeneral').addEventListener('input', updateCalculation);
+      document.getElementById('lifeInsuranceNursing').addEventListener('input', updateCalculation);
+      document.getElementById('lifeInsurancePension').addEventListener('input', updateCalculation);
+      document.getElementById('earthquakeInsurance').addEventListener('input', updateCalculation);
+      document.getElementById('socialInsuranceOther').addEventListener('input', updateCalculation);
+      
+      // その他の控除
+      document.getElementById('medicalExpenses').addEventListener('input', updateCalculation);
+      document.getElementById('smallBusinessContribution').addEventListener('input', updateCalculation);
+      document.getElementById('donation').addEventListener('input', updateCalculation);
+      document.getElementById('housingLoanDeduction').addEventListener('input', updateCalculation);
+
+      // 控除詳細の開閉
+      document.getElementById('deductionDetailToggle').addEventListener('click', toggleDeductionDetail);
+      
+      // 入力値のバリデーション
+      const numberInputs = document.querySelectorAll('input[type="number"]');
+      numberInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+          validateInput(this);
+        });
+      });
+      
+      // 初回計算（少し遅延させて確実に実行）
+      setTimeout(() => {
+        updateCalculation();
+      }, 200);
+    }
+
+    // 入力値のバリデーション
+    function validateInput(input) {
+      const value = parseFloat(input.value);
+      const min = parseFloat(input.min) || 0;
+      const max = parseFloat(input.max);
+      
+      if (isNaN(value) || value < min) {
+        input.value = min;
+        input.classList.add('border-red-500');
+        setTimeout(() => input.classList.remove('border-red-500'), 2000);
+      } else if (max && value > max) {
+        input.value = max;
+        input.classList.add('border-red-500');
+        setTimeout(() => input.classList.remove('border-red-500'), 2000);
+      } else {
+        input.classList.remove('border-red-500');
+      }
+    }
+    
+    // Chart.jsの読み込みを待つ
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        // Chart.jsが読み込まれるまで少し待つ
+        setTimeout(init, 100);
+      });
+    } else {
+      setTimeout(init, 100);
+    }
+  </script>
+</body>
+</html>
+
